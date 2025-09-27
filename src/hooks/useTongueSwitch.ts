@@ -1,7 +1,7 @@
 // src/hooks/useTongueSwitch.ts
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { FaceLandmarker, FilesetResolver, NormalizedLandmark } from '@mediapipe/tasks-vision';
 
 // Landmark indices for the inner lips
@@ -11,7 +11,8 @@ const INNER_LIP_LANDMARKS = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 3
 function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h = 0, s = 0, v = max;
+    let h = 0, s = 0;
+    const v = max; // FIXED: Changed 'let v' to 'const v'
     const d = max - min;
     s = max === 0 ? 0 : d / max;
     if (max !== min) {
@@ -34,62 +35,13 @@ export const useTongueSwitch = () => {
   const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
   const lastVideoTimeRef = useRef(-1);
   const animationFrameId = useRef<number | null>(null);
-  const lastState = useRef(false); // For tracking the rising edge
+  const lastState = useRef(false);
   
   const minOpenPx = 8;
   const fracThreshold = 0.06;
 
-  useEffect(() => {
-    let isMounted = true;
-    overlayCanvasRef.current = document.createElement('canvas');
-    processCanvasRef.current = document.createElement('canvas');
-
-    const createFaceLandmarker = async () => {
-      const filesetResolver = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-      const landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-        baseOptions: {
-          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-          delegate: "GPU"
-        },
-        runningMode: "VIDEO",
-        numFaces: 1
-      });
-      
-      if (isMounted) {
-        faceLandmarkerRef.current = landmarker;
-        await startWebcam();
-      }
-    };
-
-    const startWebcam = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-        const videoElement = document.createElement('video');
-        videoElement.autoplay = true;
-        videoElement.srcObject = stream;
-        
-        if (isMounted) {
-          videoRef.current = videoElement;
-          videoElement.onloadedmetadata = () => {
-            setIsWebcamReady(true);
-            predictWebcam();
-          };
-        }
-      } catch (err) { console.error("Error accessing webcam:", err); }
-    };
-    
-    createFaceLandmarker();
-    
-    return () => {
-      isMounted = false;
-      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
-      const stream = videoRef.current?.srcObject as MediaStream;
-      stream?.getTracks().forEach(track => track.stop());
-      faceLandmarkerRef.current?.close();
-    };
-  }, []);
-
-  const predictWebcam = () => {
+  // FIXED: Wrapped predictWebcam in useCallback to stabilize its reference for the useEffect hook
+  const predictWebcam = useCallback(() => {
     if (!videoRef.current) return;
     const video = videoRef.current;
     const overlayCanvas = overlayCanvasRef.current;
@@ -177,7 +129,57 @@ export const useTongueSwitch = () => {
       setTongueOut(isTongueOut);
     }
     animationFrameId.current = requestAnimationFrame(predictWebcam);
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    overlayCanvasRef.current = document.createElement('canvas');
+    processCanvasRef.current = document.createElement('canvas');
+
+    const createFaceLandmarker = async () => {
+      const filesetResolver = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+      const landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+        baseOptions: {
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+          delegate: "GPU"
+        },
+        runningMode: "VIDEO",
+        numFaces: 1
+      });
+      
+      if (isMounted) {
+        faceLandmarkerRef.current = landmarker;
+        await startWebcam();
+      }
+    };
+
+    const startWebcam = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        const videoElement = document.createElement('video');
+        videoElement.autoplay = true;
+        videoElement.srcObject = stream;
+        
+        if (isMounted) {
+          videoRef.current = videoElement;
+          videoElement.onloadedmetadata = () => {
+            setIsWebcamReady(true);
+            predictWebcam();
+          };
+        }
+      } catch (err) { console.error("Error accessing webcam:", err); }
+    };
+    
+    createFaceLandmarker();
+    
+    return () => {
+      isMounted = false;
+      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+      const stream = videoRef.current?.srcObject as MediaStream;
+      stream?.getTracks().forEach(track => track.stop());
+      faceLandmarkerRef.current?.close();
+    };
+  }, [predictWebcam]); // FIXED: Added predictWebcam dependency
 
   const drawOverlay = (landmarks: NormalizedLandmark[], ctx: CanvasRenderingContext2D, width: number, height: number, isDetected: boolean, open: number, frac: number) => {
     ctx.save();
@@ -210,11 +212,9 @@ export const useTongueSwitch = () => {
       lastState.current = true;
       return true;
     }
-    
     if (!tongueOut) {
       lastState.current = false;
     }
-
     return false;
   };
 
