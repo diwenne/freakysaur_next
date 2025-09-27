@@ -1,10 +1,10 @@
 // src/app/page.tsx
-import DinoGame from "@/components/DinoGame";
+import GamePage from "@/components/GamePage";
 
 export default function Home() {
   return (
     <main>
-      <DinoGame />
+      <GamePage />
     </main>
   );
 }
