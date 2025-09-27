@@ -14,7 +14,13 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
   });
 };
 const ASSETS = {
-  DINO: { RUN: ['/assets/Dino/DinoRun1.png', '/assets/Dino/DinoRun2.png'], JUMP: '/assets/Dino/DinoJump.png', DUCK: ['/assets/Dino/DinoDuck1.png', '/assets/Dino/DinoDuck2.png'], DEAD: '/assets/Dino/DinoDead.png' },
+  DINO: { 
+    RUN: ['/assets/Dino/DinoRun1.png', '/assets/Dino/DinoRun2.png'], 
+    // CHANGED: JUMP is now an array for the animation frames
+    JUMP: ['/assets/Dino/DinoJump1.png', '/assets/Dino/DinoJump2.png', '/assets/Dino/DinoJump3.png', '/assets/Dino/DinoJump4.png'], 
+    DUCK: ['/assets/Dino/DinoDuck1.png', '/assets/Dino/DinoDuck2.png'], 
+    DEAD: '/assets/Dino/DinoDead.png' 
+  },
   OBSTACLES: { CACTUS_SMALL: ['/assets/Cactus/SmallCactus1.png', '/assets/Cactus/SmallCactus2.png', '/assets/Cactus/SmallCactus3.png'], CACTUS_LARGE: ['/assets/Cactus/LargeCactus1.png', '/assets/Cactus/LargeCactus2.png', '/assets/Cactus/LargeCactus3.png'], BIRD: ['/assets/Bird/Bird1.png', '/assets/Bird/Bird2.png'] },
   OTHER: { GROUND: '/assets/Other/Track.png', CLOUD: '/assets/Other/Cloud.png', GAME_OVER: '/assets/Other/GameOver.png', RESET: '/assets/Other/Reset.png' },
 };
@@ -49,20 +55,16 @@ const DinoGame = () => {
     if (isWebcamReady && videoElement && canvasElement && containerElement) {
       const webcamWidth = 900;
       const webcamHeight = 240;
-      
       videoElement.style.width = '100%';
       videoElement.style.height = '100%';
-      // THIS IS THE FIX: 'fill' forces the video to stretch and warp.
       videoElement.style.objectFit = 'fill'; 
       videoElement.muted = true;
       videoElement.style.transform = 'scaleX(-1)';
-      
       canvasElement.width = webcamWidth;
       canvasElement.height = webcamHeight;
       canvasElement.style.position = 'absolute';
       canvasElement.style.top = '0';
       canvasElement.style.left = '0';
-
       if (!containerElement.contains(videoElement)) containerElement.appendChild(videoElement);
       if (!containerElement.contains(canvasElement)) containerElement.appendChild(canvasElement);
     }
@@ -168,7 +170,13 @@ const DinoGame = () => {
     let isMounted = true;
     const loadAllAssets = async () => {
         try {
-            gameImages.DINO = { RUN: await Promise.all(ASSETS.DINO.RUN.map(loadImage)), JUMP: await loadImage(ASSETS.DINO.JUMP), DUCK: await Promise.all(ASSETS.DINO.DUCK.map(loadImage)), DEAD: await loadImage(ASSETS.DINO.DEAD) };
+            gameImages.DINO = { 
+                RUN: await Promise.all(ASSETS.DINO.RUN.map(loadImage)), 
+                // CHANGED: Load all jump animation frames
+                JUMP: await Promise.all(ASSETS.DINO.JUMP.map(loadImage)), 
+                DUCK: await Promise.all(ASSETS.DINO.DUCK.map(loadImage)), 
+                DEAD: await loadImage(ASSETS.DINO.DEAD) 
+            };
             gameImages.OBSTACLES = { CACTUS_SMALL: await Promise.all(ASSETS.OBSTACLES.CACTUS_SMALL.map(loadImage)), CACTUS_LARGE: await Promise.all(ASSETS.OBSTACLES.CACTUS_LARGE.map(loadImage)), BIRD: await Promise.all(ASSETS.OBSTACLES.BIRD.map(loadImage)) };
             gameImages.OTHER = { GROUND: await loadImage(ASSETS.OTHER.GROUND), CLOUD: await loadImage(ASSETS.OTHER.CLOUD), GAME_OVER: await loadImage(ASSETS.OTHER.GAME_OVER), RESET: await loadImage(ASSETS.OTHER.RESET) };
             
@@ -207,34 +215,86 @@ const DinoGame = () => {
 };
 
 // --- Game Object Class Implementations ---
-// To see the new smaller hitboxes, set this to true
 const DEBUG_MODE = false; 
 
 class Dino {
-    x = DINO_INITIAL_X; y = GROUND_Y; velY = 0; gravity = 2500; jumpSpeed = -900; isDucking = false; isAlive = true; images: { RUN: HTMLImageElement[], JUMP: HTMLImageElement, DUCK: HTMLImageElement[], DEAD: HTMLImageElement }; currentImage: HTMLImageElement; width = 0; height = 0; animTimer = 0; animIndex = 0; animRate = 0.09;
+    x = DINO_INITIAL_X; y = GROUND_Y; velY = 0; gravity = 2500; jumpSpeed = -900; isDucking = false; isAlive = true; images: { RUN: HTMLImageElement[], JUMP: HTMLImageElement[], DUCK: HTMLImageElement[], DEAD: HTMLImageElement }; currentImage: HTMLImageElement; width = 0; height = 0; 
+    // Animation timers
+    runAnimTimer = 0;
+    runAnimIndex = 0;
+    runAnimRate = 0.09;
+    // CHANGED: Added separate animation properties for jumping
+    jumpAnimTimer = 0;
+    jumpAnimIndex = 0;
+    jumpAnimRate = 0.1;
+
     constructor(images: any) { this.images = images; this.currentImage = this.images.RUN[0]; this.y = GROUND_Y - this.currentImage.height; this.width = this.currentImage.width; this.height = this.currentImage.height; }
+    getHitbox() { return { x: this.x + 20, y: this.y + 15, width: this.width - 35, height: this.height - 25 }; }
     
-    // HITBOX FIX: Made hitbox significantly smaller
-    getHitbox() {
-        return { x: this.x + 20, y: this.y + 15, width: this.width - 35, height: this.height - 25 };
+    startJump() { 
+        if (this.isAlive && this.y + this.height >= GROUND_Y) { 
+            this.velY = this.jumpSpeed;
+            // CHANGED: Reset jump animation on a new jump
+            this.jumpAnimIndex = 0;
+            this.jumpAnimTimer = 0;
+        } 
     }
 
-    startJump() { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.velY = this.jumpSpeed; } }
     setDuck(value: boolean) { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.isDucking = value; } }
     die() { this.isAlive = false; this.currentImage = this.images.DEAD; }
-    update(dt: number) { if (!this.isAlive) return; this.velY += this.gravity * dt; this.y += this.velY * dt; const onGround = this.y + this.height >= GROUND_Y; if (onGround) { this.y = GROUND_Y - this.height; this.velY = 0; } this.animTimer += dt; if (this.animTimer > this.animRate) { this.animTimer = 0; this.animIndex = (this.animIndex + 1) % 2; } if (!onGround) { this.currentImage = this.images.JUMP; } else if (this.isDucking) { this.currentImage = this.images.DUCK[this.animIndex]; } else { this.currentImage = this.images.RUN[this.animIndex]; } this.width = this.currentImage.width; this.height = this.currentImage.height; if (onGround) { this.y = GROUND_Y - this.height; } }
+
+    update(dt: number) { 
+        if (!this.isAlive) return; 
+        this.velY += this.gravity * dt; 
+        this.y += this.velY * dt; 
+        const onGround = this.y + this.height >= GROUND_Y; 
+        
+        if (onGround) { 
+            this.y = GROUND_Y - this.height; 
+            this.velY = 0; 
+        } 
+
+        // CHANGED: Updated animation logic
+        if (!onGround) {
+            // Jumping animation
+            this.jumpAnimTimer += dt;
+            if (this.jumpAnimTimer > this.jumpAnimRate) {
+                this.jumpAnimTimer = 0;
+                this.jumpAnimIndex = (this.jumpAnimIndex + 1) % this.images.JUMP.length; // Loop through jump frames
+            }
+            this.currentImage = this.images.JUMP[this.jumpAnimIndex];
+        } else if (this.isDucking) {
+            // Ducking animation
+            this.runAnimTimer += dt;
+            if (this.runAnimTimer > this.runAnimRate) {
+                this.runAnimTimer = 0;
+                this.runAnimIndex = (this.runAnimIndex + 1) % this.images.DUCK.length;
+            }
+            this.currentImage = this.images.DUCK[this.runAnimIndex];
+        } else {
+            // Running animation
+            this.runAnimTimer += dt;
+            if (this.runAnimTimer > this.runAnimRate) {
+                this.runAnimTimer = 0;
+                this.runAnimIndex = (this.runAnimIndex + 1) % this.images.RUN.length;
+            }
+            this.currentImage = this.images.RUN[this.runAnimIndex];
+        }
+        
+        this.width = this.currentImage.width; 
+        this.height = this.currentImage.height; 
+        if (onGround) { 
+            this.y = GROUND_Y - this.height; 
+        } 
+    }
+    
     draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.currentImage, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } }
 }
 
 class Obstacle {
     x = GAME_WIDTH; y = 0; width = 0; height = 0; image: HTMLImageElement;
     constructor(image: HTMLImageElement) { this.image = image; this.width = image.width; this.height = image.height; }
-    
-    // HITBOX FIX: Made hitbox significantly smaller
-    getHitbox() {
-        return { x: this.x + 8, y: this.y + 8, width: this.width - 16, height: this.height - 16 };
-    }
-
+    getHitbox() { return { x: this.x + 8, y: this.y + 8, width: this.width - 16, height: this.height - 16 }; }
     isColliding(dino: Dino): boolean { const dinoBox = dino.getHitbox(); const obsBox = this.getHitbox(); return (dinoBox.x < obsBox.x + obsBox.width && dinoBox.x + dinoBox.width > obsBox.x && dinoBox.y < obsBox.y + obsBox.height && dinoBox.y + dinoBox.height > obsBox.y); }
     update(dt: number, speed: number) { this.x -= speed * dt; }
     draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } }
