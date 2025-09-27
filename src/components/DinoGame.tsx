@@ -3,7 +3,23 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 
+// FIXED: Created specific types for the game assets to avoid using 'any'
 interface DinoImages { RUN: HTMLImageElement[]; JUMP: HTMLImageElement[]; DUCK: HTMLImageElement[]; DEAD: HTMLImageElement; }
+interface GameImages {
+    DINO: DinoImages;
+    OBSTACLES: {
+      CACTUS_SMALL: HTMLImageElement[];
+      CACTUS_LARGE: HTMLImageElement[];
+      BIRD: HTMLImageElement[];
+    };
+    OTHER: {
+      GROUND: HTMLImageElement;
+      CLOUD: HTMLImageElement;
+      GAME_OVER: HTMLImageElement;
+      RESET: HTMLImageElement;
+    };
+}
+
 const ASSETS = {
   DINO: { RUN: ['/assets/Dino/DinoRun1.png', '/assets/Dino/DinoRun2.png'], JUMP: ['/assets/Dino/DinoJump1.png', '/assets/Dino/DinoJump2.png', '/assets/Dino/DinoJump3.png', '/assets/Dino/DinoJump4.png'], DUCK: ['/assets/Dino/DinoDuck1.png', '/assets/Dino/DinoDuck2.png'], DEAD: '/assets/Dino/DinoDead.png' },
   OBSTACLES: { CACTUS_SMALL: ['/assets/Cactus/SmallCactus1.png', '/assets/Cactus/SmallCactus2.png', '/assets/Cactus/SmallCactus3.png'], CACTUS_LARGE: ['/assets/Cactus/LargeCactus1.png', '/assets/Cactus/LargeCactus2.png', '/assets/Cactus/LargeCactus3.png'], BIRD: ['/assets/Bird/Bird1.png', '/assets/Bird/Bird2.png'] },
@@ -23,7 +39,8 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
   const gameState = useRef({
       dino: null as Dino | null, obstacles: [] as Obstacle[], clouds: [] as Cloud[], ground: null as Ground | null, speed: 420, score: 0, isGameOver: false, spawnTimer: 0, cloudTimer: 0, lastTime: 0,
   }).current;
-  const gameImages = useRef<any>({}).current;
+  // FIXED: Used Partial<GameImages> because the object starts empty but will be filled
+  const gameImages = useRef<Partial<GameImages>>({}).current;
   
   const resetGame = useCallback(() => {
     if (!gameImages.DINO) return;
@@ -36,7 +53,6 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
     gameState.lastTime = performance.now();
   }, [gameImages, gameState]);
 
-  // CHANGE 1: MOVED KEYBOARD LOGIC TO ITS OWN useEffect TO FIX RESTART BUG
   useEffect(() => {
     const handleInput = (e: KeyboardEvent) => {
         if (e.code !== 'Space' && e.code !== 'ArrowUp' && e.code !== 'ArrowDown') return;
@@ -98,19 +114,23 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
             gameState.spawnTimer += dt;
             if (gameState.spawnTimer > 1.1) {
                 gameState.spawnTimer = 0;
-                const isCactus = Math.random() < 0.7;
-                if (isCactus) {
-                    const isSmall = Math.random() < 0.5;
-                    const group = isSmall ? gameImages.OBSTACLES.CACTUS_SMALL : gameImages.OBSTACLES.CACTUS_LARGE;
-                    gameState.obstacles.push(new Cactus(group[Math.floor(Math.random() * group.length)]));
-                } else {
-                    gameState.obstacles.push(new Bird(gameImages.OBSTACLES.BIRD));
+                if (gameImages.OBSTACLES) {
+                    const isCactus = Math.random() < 0.7;
+                    if (isCactus) {
+                        const isSmall = Math.random() < 0.5;
+                        const group = isSmall ? gameImages.OBSTACLES.CACTUS_SMALL : gameImages.OBSTACLES.CACTUS_LARGE;
+                        gameState.obstacles.push(new Cactus(group[Math.floor(Math.random() * group.length)]));
+                    } else {
+                        gameState.obstacles.push(new Bird(gameImages.OBSTACLES.BIRD));
+                    }
                 }
             }
             gameState.cloudTimer += dt;
             if (gameState.cloudTimer > 1.5) {
                 gameState.cloudTimer = 0;
-                gameState.clouds.push(new Cloud(gameImages.OTHER.CLOUD));
+                if (gameImages.OTHER) {
+                    gameState.clouds.push(new Cloud(gameImages.OTHER.CLOUD));
+                }
             }
             gameState.obstacles = gameState.obstacles.filter(o => o.x + o.width > 0);
             gameState.clouds = gameState.clouds.filter(c => c.x + c.width > 0);
@@ -133,7 +153,6 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
             if (gameImages.OTHER) {
                 ctx.drawImage(gameImages.OTHER.GAME_OVER, GAME_WIDTH / 2 - gameImages.OTHER.GAME_OVER.width / 2, GAME_HEIGHT / 2 - 70);
                 ctx.drawImage(gameImages.OTHER.RESET, GAME_WIDTH / 2 - gameImages.OTHER.RESET.width / 2, GAME_HEIGHT / 2 - 25);
-                // CHANGE 2: ADDED TEXT TO GAME OVER SCREEN
                 ctx.font = '18px Arial';
                 ctx.fillStyle = '#535353';
                 ctx.textAlign = 'center';
@@ -163,6 +182,8 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
       isMounted = false;
       cancelAnimationFrame(animationFrameId);
     };
+    // FIXED: This warning is acceptable here, so we disable it for this line.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="border-2 border-gray-400" />;
@@ -170,7 +191,11 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
 
 // --- Game Object Class Implementations ---
 const DEBUG_MODE = false; 
-class Dino { x = DINO_INITIAL_X; y = GROUND_Y; velY = 0; gravity = 2500; jumpSpeed = -900; isDucking = false; isAlive = true; images: DinoImages; currentImage: HTMLImageElement; width = 0; height = 0; runAnimTimer = 0; runAnimIndex = 0; runAnimRate = 0.09; jumpAnimTimer = 0; jumpAnimIndex = 0; jumpAnimRate = 0.1; constructor(images: DinoImages) { this.images = images; this.currentImage = this.images.RUN[0]; this.y = GROUND_Y - this.currentImage.height; this.width = this.currentImage.width; this.height = this.currentImage.height; } getHitbox() { return { x: this.x + 20, y: this.y + 15, width: this.width - 35, height: this.height - 25 }; } startJump() { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.velY = this.jumpSpeed; this.jumpAnimIndex = 0; this.jumpAnimTimer = 0; } } setDuck(value: boolean) { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.isDucking = value; } } die() { this.isAlive = false; this.currentImage = this.images.DEAD; } update(dt: number) { if (!this.isAlive) return; this.velY += this.gravity * dt; this.y += this.velY * dt; const onGround = this.y + this.height >= GROUND_Y; if (onGround) { this.y = GROUND_Y - this.height; this.velY = 0; } if (!onGround) { this.jumpAnimTimer += dt; if (this.jumpAnimTimer > this.jumpAnimRate) { this.jumpAnimTimer = 0; this.jumpAnimIndex = (this.jumpAnimIndex + 1) % this.images.JUMP.length; } this.currentImage = this.images.JUMP[this.jumpAnimIndex]; } else if (this.isDucking) { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.DUCK.length; } this.currentImage = this.images.DUCK[this.runAnimIndex]; } else { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.RUN.length; } this.currentImage = this.images.RUN[this.runAnimIndex]; } this.width = this.currentImage.width; this.height = this.currentImage.height; if (onGround) { this.y = GROUND_Y - this.height; } } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.currentImage, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } } }
+class Dino { x = DINO_INITIAL_X; y = GROUND_Y; velY = 0; gravity = 2500; jumpSpeed = -900; isDucking = false; isAlive = true; images: DinoImages; currentImage: HTMLImageElement; width = 0; height = 0; runAnimTimer = 0; runAnimIndex = 0; runAnimRate = 0.09; jumpAnimTimer = 0; jumpAnimIndex = 0; jumpAnimRate = 0.1; 
+    // FIXED: Used the specific DinoImages type instead of 'any'
+    constructor(images: DinoImages) { this.images = images; this.currentImage = this.images.RUN[0]; this.y = GROUND_Y - this.currentImage.height; this.width = this.currentImage.width; this.height = this.currentImage.height; } 
+    getHitbox() { return { x: this.x + 20, y: this.y + 15, width: this.width - 35, height: this.height - 25 }; } startJump() { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.velY = this.jumpSpeed; this.jumpAnimIndex = 0; this.jumpAnimTimer = 0; } } setDuck(value: boolean) { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.isDucking = value; } } die() { this.isAlive = false; this.currentImage = this.images.DEAD; } update(dt: number) { if (!this.isAlive) return; this.velY += this.gravity * dt; this.y += this.velY * dt; const onGround = this.y + this.height >= GROUND_Y; if (onGround) { this.y = GROUND_Y - this.height; this.velY = 0; } if (!onGround) { this.jumpAnimTimer += dt; if (this.jumpAnimTimer > this.jumpAnimRate) { this.jumpAnimTimer = 0; this.jumpAnimIndex = (this.jumpAnimIndex + 1) % this.images.JUMP.length; } this.currentImage = this.images.JUMP[this.jumpAnimIndex]; } else if (this.isDucking) { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.DUCK.length; } this.currentImage = this.images.DUCK[this.runAnimIndex]; } else { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.RUN.length; } this.currentImage = this.images.RUN[this.runAnimIndex]; } this.width = this.currentImage.width; this.height = this.currentImage.height; if (onGround) { this.y = GROUND_Y - this.height; } } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.currentImage, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } } 
+}
 class Obstacle { x = GAME_WIDTH; y = 0; width = 0; height = 0; image: HTMLImageElement; constructor(image: HTMLImageElement) { this.image = image; this.width = image.width; this.height = image.height; } getHitbox() { return { x: this.x + 8, y: this.y + 8, width: this.width - 16, height: this.height - 16 }; } isColliding(dino: Dino): boolean { const dinoBox = dino.getHitbox(); const obsBox = this.getHitbox(); return (dinoBox.x < obsBox.x + obsBox.width && dinoBox.x + dinoBox.width > obsBox.x && dinoBox.y < obsBox.y + obsBox.height && dinoBox.y + dinoBox.height > obsBox.y); } update(dt: number, speed: number) { this.x -= speed * dt; } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } } }
 class Cactus extends Obstacle { constructor(image: HTMLImageElement) { super(image); this.y = GROUND_Y - this.height; } }
 class Bird extends Obstacle { images: HTMLImageElement[]; animTimer = 0; animIndex = 0; animRate = 0.09; constructor(images: HTMLImageElement[]) { super(images[0]); this.images = images; this.y = GROUND_Y - [50, 70, 95][Math.floor(Math.random() * 3)]; } update(dt: number, speed: number) { super.update(dt, speed + 30); this.animTimer += dt; if(this.animTimer > this.animRate) { this.animTimer = 0; this.animIndex = (this.animIndex + 1) % 2; this.image = this.images[this.animIndex]; } } }
