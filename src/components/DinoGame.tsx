@@ -137,7 +137,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
                 ctx.font = '18px Arial';
                 ctx.fillStyle = '#535353';
                 ctx.textAlign = 'center';
-                ctx.fillText('tongue out for 5s to play again', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 70);
+                ctx.fillText('space bar to play again', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 70);
             }
         }
         
