@@ -14,13 +14,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
   });
 };
 const ASSETS = {
-  DINO: { 
-    RUN: ['/assets/Dino/DinoRun1.png', '/assets/Dino/DinoRun2.png'], 
-    // CHANGED: JUMP is now an array for the animation frames
-    JUMP: ['/assets/Dino/DinoJump1.png', '/assets/Dino/DinoJump2.png', '/assets/Dino/DinoJump3.png', '/assets/Dino/DinoJump4.png'], 
-    DUCK: ['/assets/Dino/DinoDuck1.png', '/assets/Dino/DinoDuck2.png'], 
-    DEAD: '/assets/Dino/DinoDead.png' 
-  },
+  DINO: { RUN: ['/assets/Dino/DinoRun1.png', '/assets/Dino/DinoRun2.png'], JUMP: ['/assets/Dino/DinoJump1.png', '/assets/Dino/DinoJump2.png', '/assets/Dino/DinoJump3.png', '/assets/Dino/DinoJump4.png'], DUCK: ['/assets/Dino/DinoDuck1.png', '/assets/Dino/DinoDuck2.png'], DEAD: '/assets/Dino/DinoDead.png' },
   OBSTACLES: { CACTUS_SMALL: ['/assets/Cactus/SmallCactus1.png', '/assets/Cactus/SmallCactus2.png', '/assets/Cactus/SmallCactus3.png'], CACTUS_LARGE: ['/assets/Cactus/LargeCactus1.png', '/assets/Cactus/LargeCactus2.png', '/assets/Cactus/LargeCactus3.png'], BIRD: ['/assets/Bird/Bird1.png', '/assets/Bird/Bird2.png'] },
   OTHER: { GROUND: '/assets/Other/Track.png', CLOUD: '/assets/Other/Cloud.png', GAME_OVER: '/assets/Other/GameOver.png', RESET: '/assets/Other/Reset.png' },
 };
@@ -35,7 +29,7 @@ const DINO_INITIAL_X = 40;
 const DinoGame = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const webcamContainerRef = useRef<HTMLDivElement>(null);
-  const { consumeRisingEdge, videoRef, overlayCanvasRef, isWebcamReady } = useTongueSwitch();
+  const { consumeRisingEdge, videoRef, overlayCanvasRef, isWebcamReady, isCalibrating, calibrationProgress } = useTongueSwitch();
   
   const consumeRisingEdgeRef = useRef(consumeRisingEdge);
   useEffect(() => {
@@ -53,15 +47,13 @@ const DinoGame = () => {
     const containerElement = webcamContainerRef.current;
 
     if (isWebcamReady && videoElement && canvasElement && containerElement) {
-      const webcamWidth = 900;
-      const webcamHeight = 240;
       videoElement.style.width = '100%';
       videoElement.style.height = '100%';
-      videoElement.style.objectFit = 'fill'; 
+      videoElement.style.objectFit = 'fill';
       videoElement.muted = true;
       videoElement.style.transform = 'scaleX(-1)';
-      canvasElement.width = webcamWidth;
-      canvasElement.height = webcamHeight;
+      canvasElement.width = 900;
+      canvasElement.height = 240;
       canvasElement.style.position = 'absolute';
       canvasElement.style.top = '0';
       canvasElement.style.left = '0';
@@ -96,7 +88,10 @@ const DinoGame = () => {
   };
   
   const gameLoop = (timestamp: number) => {
-    if (gameState.isGameOver || !canvasRef.current) return;
+    if (isCalibrating || gameState.isGameOver || !canvasRef.current) {
+        if (!gameState.isGameOver) requestAnimationFrame(gameLoop);
+        return;
+    };
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
     const dt = (timestamp - gameState.lastTime) / 1000;
@@ -170,151 +165,72 @@ const DinoGame = () => {
     let isMounted = true;
     const loadAllAssets = async () => {
         try {
-            gameImages.DINO = { 
-                RUN: await Promise.all(ASSETS.DINO.RUN.map(loadImage)), 
-                // CHANGED: Load all jump animation frames
-                JUMP: await Promise.all(ASSETS.DINO.JUMP.map(loadImage)), 
-                DUCK: await Promise.all(ASSETS.DINO.DUCK.map(loadImage)), 
-                DEAD: await loadImage(ASSETS.DINO.DEAD) 
-            };
+            gameImages.DINO = { RUN: await Promise.all(ASSETS.DINO.RUN.map(loadImage)), JUMP: await Promise.all(ASSETS.DINO.JUMP.map(loadImage)), DUCK: await Promise.all(ASSETS.DINO.DUCK.map(loadImage)), DEAD: await loadImage(ASSETS.DINO.DEAD) };
             gameImages.OBSTACLES = { CACTUS_SMALL: await Promise.all(ASSETS.OBSTACLES.CACTUS_SMALL.map(loadImage)), CACTUS_LARGE: await Promise.all(ASSETS.OBSTACLES.CACTUS_LARGE.map(loadImage)), BIRD: await Promise.all(ASSETS.OBSTACLES.BIRD.map(loadImage)) };
             gameImages.OTHER = { GROUND: await loadImage(ASSETS.OTHER.GROUND), CLOUD: await loadImage(ASSETS.OTHER.CLOUD), GAME_OVER: await loadImage(ASSETS.OTHER.GAME_OVER), RESET: await loadImage(ASSETS.OTHER.RESET) };
             
             if (isMounted) {
                 gameState.ground = new Ground(gameImages.OTHER.GROUND);
-                resetGame();
+                if (!isCalibrating) {
+                    resetGame();
+                }
             }
         } catch (error) {
             console.error("Failed to load game assets:", error);
         }
     };
+
     loadAllAssets();
+    
+    if (!isCalibrating && !gameState.dino) {
+        resetGame();
+    }
+
     return () => {
       isMounted = false;
       window.removeEventListener('keydown', handleInput);
       window.removeEventListener('keyup', handleInput);
     };
-  }, []);
+  }, [isCalibrating]);
 
   return (
     <div className="flex flex-col items-center justify-center p-4">
+      
+      {/* CHANGED: Title and text are now at the very top */}
+      <div className="mb-4 p-4 bg-gray-800 text-white rounded-lg shadow-lg text-center w-[900px]">
+        <h1 className="text-3xl font-bold font-serif italic mb-2">Steve the 𝓕𝓻𝓮𝓪𝓴𝔂saur ❤️</h1>
+        {/* CHANGED: Subtitle text is updated */}
+        <p className="text-lg font-mono text-cyan-300">Stick out your tongue to JUMP!</p>
+      </div>
+
+      {/* Webcam and Game are stacked below */}
       <div 
         ref={webcamContainerRef}
         className="relative mb-4 border-2 border-gray-400 w-[900px] h-[240px] bg-gray-900 flex items-center justify-center overflow-hidden"
       >
         {!isWebcamReady && <p className="text-white">Starting webcam...</p>}
+        {isCalibrating && isWebcamReady && (
+            <div className="z-10 text-white text-center">
+                <p className="text-2xl font-bold">Calibrating: Keep Face Neutral</p>
+                <div className="w-64 h-4 bg-gray-600 rounded-full mt-2 overflow-hidden">
+                    <div className="h-4 bg-green-500 rounded-full" style={{ width: `${calibrationProgress * 100}%` }}></div>
+                </div>
+            </div>
+        )}
       </div>
       
-      <div className="mb-4 p-2 bg-gray-800 text-white rounded-lg shadow-lg text-center">
-        <h1 className="text-xl font-bold">Steve the Freakysaur</h1>
-        <p>Use <span className="font-mono text-yellow-300">Space/Up Arrow</span> or your <span className="font-mono text-cyan-300">Tongue</span> to Jump!</p>
-      </div>
       <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="border-2 border-gray-400" />
     </div>
   );
 };
 
-// --- Game Object Class Implementations ---
+// --- Game Object Class Implementations (No Changes Below) ---
 const DEBUG_MODE = false; 
 
-class Dino {
-    x = DINO_INITIAL_X; y = GROUND_Y; velY = 0; gravity = 2500; jumpSpeed = -900; isDucking = false; isAlive = true; images: { RUN: HTMLImageElement[], JUMP: HTMLImageElement[], DUCK: HTMLImageElement[], DEAD: HTMLImageElement }; currentImage: HTMLImageElement; width = 0; height = 0; 
-    // Animation timers
-    runAnimTimer = 0;
-    runAnimIndex = 0;
-    runAnimRate = 0.09;
-    // CHANGED: Added separate animation properties for jumping
-    jumpAnimTimer = 0;
-    jumpAnimIndex = 0;
-    jumpAnimRate = 0.1;
-
-    constructor(images: any) { this.images = images; this.currentImage = this.images.RUN[0]; this.y = GROUND_Y - this.currentImage.height; this.width = this.currentImage.width; this.height = this.currentImage.height; }
-    getHitbox() { return { x: this.x + 20, y: this.y + 15, width: this.width - 35, height: this.height - 25 }; }
-    
-    startJump() { 
-        if (this.isAlive && this.y + this.height >= GROUND_Y) { 
-            this.velY = this.jumpSpeed;
-            // CHANGED: Reset jump animation on a new jump
-            this.jumpAnimIndex = 0;
-            this.jumpAnimTimer = 0;
-        } 
-    }
-
-    setDuck(value: boolean) { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.isDucking = value; } }
-    die() { this.isAlive = false; this.currentImage = this.images.DEAD; }
-
-    update(dt: number) { 
-        if (!this.isAlive) return; 
-        this.velY += this.gravity * dt; 
-        this.y += this.velY * dt; 
-        const onGround = this.y + this.height >= GROUND_Y; 
-        
-        if (onGround) { 
-            this.y = GROUND_Y - this.height; 
-            this.velY = 0; 
-        } 
-
-        // CHANGED: Updated animation logic
-        if (!onGround) {
-            // Jumping animation
-            this.jumpAnimTimer += dt;
-            if (this.jumpAnimTimer > this.jumpAnimRate) {
-                this.jumpAnimTimer = 0;
-                this.jumpAnimIndex = (this.jumpAnimIndex + 1) % this.images.JUMP.length; // Loop through jump frames
-            }
-            this.currentImage = this.images.JUMP[this.jumpAnimIndex];
-        } else if (this.isDucking) {
-            // Ducking animation
-            this.runAnimTimer += dt;
-            if (this.runAnimTimer > this.runAnimRate) {
-                this.runAnimTimer = 0;
-                this.runAnimIndex = (this.runAnimIndex + 1) % this.images.DUCK.length;
-            }
-            this.currentImage = this.images.DUCK[this.runAnimIndex];
-        } else {
-            // Running animation
-            this.runAnimTimer += dt;
-            if (this.runAnimTimer > this.runAnimRate) {
-                this.runAnimTimer = 0;
-                this.runAnimIndex = (this.runAnimIndex + 1) % this.images.RUN.length;
-            }
-            this.currentImage = this.images.RUN[this.runAnimIndex];
-        }
-        
-        this.width = this.currentImage.width; 
-        this.height = this.currentImage.height; 
-        if (onGround) { 
-            this.y = GROUND_Y - this.height; 
-        } 
-    }
-    
-    draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.currentImage, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } }
-}
-
-class Obstacle {
-    x = GAME_WIDTH; y = 0; width = 0; height = 0; image: HTMLImageElement;
-    constructor(image: HTMLImageElement) { this.image = image; this.width = image.width; this.height = image.height; }
-    getHitbox() { return { x: this.x + 8, y: this.y + 8, width: this.width - 16, height: this.height - 16 }; }
-    isColliding(dino: Dino): boolean { const dinoBox = dino.getHitbox(); const obsBox = this.getHitbox(); return (dinoBox.x < obsBox.x + obsBox.width && dinoBox.x + dinoBox.width > obsBox.x && dinoBox.y < obsBox.y + obsBox.height && dinoBox.y + dinoBox.height > obsBox.y); }
-    update(dt: number, speed: number) { this.x -= speed * dt; }
-    draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } }
-}
+class Dino { x = DINO_INITIAL_X; y = GROUND_Y; velY = 0; gravity = 2500; jumpSpeed = -900; isDucking = false; isAlive = true; images: { RUN: HTMLImageElement[], JUMP: HTMLImageElement[], DUCK: HTMLImageElement[], DEAD: HTMLImageElement }; currentImage: HTMLImageElement; width = 0; height = 0; runAnimTimer = 0; runAnimIndex = 0; runAnimRate = 0.09; jumpAnimTimer = 0; jumpAnimIndex = 0; jumpAnimRate = 0.1; constructor(images: any) { this.images = images; this.currentImage = this.images.RUN[0]; this.y = GROUND_Y - this.currentImage.height; this.width = this.currentImage.width; this.height = this.currentImage.height; } getHitbox() { return { x: this.x + 20, y: this.y + 15, width: this.width - 35, height: this.height - 25 }; } startJump() { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.velY = this.jumpSpeed; this.jumpAnimIndex = 0; this.jumpAnimTimer = 0; } } setDuck(value: boolean) { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.isDucking = value; } } die() { this.isAlive = false; this.currentImage = this.images.DEAD; } update(dt: number) { if (!this.isAlive) return; this.velY += this.gravity * dt; this.y += this.velY * dt; const onGround = this.y + this.height >= GROUND_Y; if (onGround) { this.y = GROUND_Y - this.height; this.velY = 0; } if (!onGround) { this.jumpAnimTimer += dt; if (this.jumpAnimTimer > this.jumpAnimRate) { this.jumpAnimTimer = 0; this.jumpAnimIndex = (this.jumpAnimIndex + 1) % this.images.JUMP.length; } this.currentImage = this.images.JUMP[this.jumpAnimIndex]; } else if (this.isDucking) { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.DUCK.length; } this.currentImage = this.images.DUCK[this.runAnimIndex]; } else { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.RUN.length; } this.currentImage = this.images.RUN[this.runAnimIndex]; } this.width = this.currentImage.width; this.height = this.currentImage.height; if (onGround) { this.y = GROUND_Y - this.height; } } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.currentImage, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } } }
+class Obstacle { x = GAME_WIDTH; y = 0; width = 0; height = 0; image: HTMLImageElement; constructor(image: HTMLImageElement) { this.image = image; this.width = image.width; this.height = image.height; } getHitbox() { return { x: this.x + 8, y: this.y + 8, width: this.width - 16, height: this.height - 16 }; } isColliding(dino: Dino): boolean { const dinoBox = dino.getHitbox(); const obsBox = this.getHitbox(); return (dinoBox.x < obsBox.x + obsBox.width && dinoBox.x + dinoBox.width > obsBox.x && dinoBox.y < obsBox.y + obsBox.height && dinoBox.y + dinoBox.height > obsBox.y); } update(dt: number, speed: number) { this.x -= speed * dt; } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } } }
 class Cactus extends Obstacle { constructor(image: HTMLImageElement) { super(image); this.y = GROUND_Y - this.height; } }
-class Bird extends Obstacle {
-    images: HTMLImageElement[]; animTimer = 0; animIndex = 0; animRate = 0.09;
-    constructor(images: HTMLImageElement[]) { super(images[0]); this.images = images; this.y = GROUND_Y - [50, 70, 95][Math.floor(Math.random() * 3)]; }
-    update(dt: number, speed: number) { super.update(dt, speed + 30); this.animTimer += dt; if(this.animTimer > this.animRate) { this.animTimer = 0; this.animIndex = (this.animIndex + 1) % 2; this.image = this.images[this.animIndex]; } }
-}
-class Ground {
-    image: HTMLImageElement; x1 = 0; x2: number; y: number;
-    constructor(image: HTMLImageElement) { this.image = image; this.x2 = image.width; this.y = GROUND_Y - 20; }
-    update(dt: number, speed: number) { this.x1 -= speed * dt; this.x2 -= speed * dt; if(this.x1 <= -this.image.width) this.x1 = this.x2 + this.image.width; if(this.x2 <= -this.image.width) this.x2 = this.x1 + this.image.width; }
-    draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x1, this.y); ctx.drawImage(this.image, this.x2, this.y); }
-}
-class Cloud {
-    image: HTMLImageElement; x = GAME_WIDTH + Math.random() * 250; y = Math.random() * (GROUND_Y - 180) + 20; width: number; height: number;
-    constructor(image: HTMLImageElement) { this.image = image; this.width = image.width; this.height = image.height; }
-    update(dt: number, speed: number) { this.x -= (speed * 0.4) * dt; }
-    draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x, this.y); }
-}
+class Bird extends Obstacle { images: HTMLImageElement[]; animTimer = 0; animIndex = 0; animRate = 0.09; constructor(images: HTMLImageElement[]) { super(images[0]); this.images = images; this.y = GROUND_Y - [50, 70, 95][Math.floor(Math.random() * 3)]; } update(dt: number, speed: number) { super.update(dt, speed + 30); this.animTimer += dt; if(this.animTimer > this.animRate) { this.animTimer = 0; this.animIndex = (this.animIndex + 1) % 2; this.image = this.images[this.animIndex]; } } }
+class Ground { image: HTMLImageElement; x1 = 0; x2: number; y: number; constructor(image: HTMLImageElement) { this.image = image; this.x2 = image.width; this.y = GROUND_Y - 20; } update(dt: number, speed: number) { this.x1 -= speed * dt; this.x2 -= speed * dt; if(this.x1 <= -this.image.width) this.x1 = this.x2 + this.image.width; if(this.x2 <= -this.image.width) this.x2 = this.x1 + this.image.width; } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x1, this.y); ctx.drawImage(this.image, this.x2, this.y); } }
+class Cloud { image: HTMLImageElement; x = GAME_WIDTH + Math.random() * 250; y = Math.random() * (GROUND_Y - 180) + 20; width: number; height: number; constructor(image: HTMLImageElement) { this.image = image; this.width = image.width; this.height = image.height; } update(dt: number, speed: number) { this.x -= (speed * 0.4) * dt; } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x, this.y); } }
 export default DinoGame;
