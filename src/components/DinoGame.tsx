@@ -174,14 +174,14 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, tongueOut, be
                 ctx.strokeStyle = '#535353';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                const progress = Math.min(1, gameState.tongueHoldTimer / 5.0);
+                const progress = Math.min(1, gameState.tongueHoldTimer / 3.0);
                 ctx.fillStyle = '#22c55e';
                 ctx.fillRect(barX, barY, barWidth * progress, barHeight);
                 
                 ctx.font = '16px Arial';
                 ctx.fillStyle = '#535353';
                 ctx.textAlign = 'center';
-                const remain = Math.max(0, 5.0 - gameState.tongueHoldTimer);
+                const remain = Math.max(0, 3.0 - gameState.tongueHoldTimer);
                 const holdText = tongueOutRef.current ? `Hold tongue for ${remain.toFixed(1)}s to restart` : `Hold tongue to restart`;
                 ctx.fillText(holdText, GAME_WIDTH / 2, barY + barHeight + 20);
             }

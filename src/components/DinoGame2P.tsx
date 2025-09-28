@@ -205,7 +205,7 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
                 ctx.fillText(gameState.winner, GAME_WIDTH/2, GAME_HEIGHT/2 + 20);
                 const barWidth = 300, barHeight = 20, barX = GAME_WIDTH / 2 - barWidth / 2, barY = GAME_HEIGHT / 2 + 60;
                 ctx.fillStyle = '#535353'; ctx.fillRect(barX, barY, barWidth, barHeight);
-                const progress = gameState.duoHoldTimer / 5.0;
+                const progress = gameState.duoHoldTimer / 3.0;
                 ctx.fillStyle = '#22c55e'; ctx.fillRect(barX, barY, barWidth * progress, barHeight);
                 ctx.font = '16px Arial'; ctx.fillStyle = 'white';
                 ctx.fillText(`Hold Both Tongues to Restart: ${Math.floor(progress*100)}%`, GAME_WIDTH/2, barY + 40);
