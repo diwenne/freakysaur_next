@@ -151,25 +151,25 @@ const GamePage = () => {
                 />
             )}
 
-            <div className="grid grid-cols-3 gap-4 mt-4 w-[900px]">
+            <div className="grid grid-cols-3 gap-4 mt-4 w-[900px] h-[25px]">
                 <button 
                     onClick={() => setActiveGame('dino')}
                     disabled={activeGame === 'dino'}
-                    className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                    className="px-10 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                 >
                   Steve 1P
                 </button>
                  <button 
                     onClick={() => setActiveGame('dino2p')}
                     disabled={activeGame === 'dino2p'}
-                    className="px-6 py-3 bg-orange-500 text-white font-bold rounded-lg hover:bg-orange-600 transition-colors disabled:bg-orange-300 disabled:cursor-not-allowed"
+                    className="px-10 py-3 bg-orange-500 text-white font-bold rounded-lg hover:bg-orange-600 transition-colors disabled:bg-orange-300 disabled:cursor-not-allowed"
                 >
                   Steve 2P
                 </button>
                 <button 
                     onClick={() => setActiveGame('flappy')}
                     disabled={activeGame === 'flappy'}
-                    className="px-6 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors disabled:bg-purple-400 disabled:cursor-not-allowed"
+                    className="px-10 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors disabled:bg-purple-400 disabled:cursor-not-allowed"
                 >
                   Play Freaky Bird
                 </button>
