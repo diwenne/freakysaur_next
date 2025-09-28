@@ -10,7 +10,6 @@ function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
     let h = 0, s = 0;
-    // FIXED: Changed 'let v' to 'const v' to satisfy linter
     const v = max; 
     const d = max - min;
     s = max === 0 ? 0 : d / max;
@@ -39,7 +38,6 @@ export const useTongueSwitch = () => {
   const minOpenPx = 8;
   const fracThreshold = 0.06;
 
-  // FIXED: Wrapped predictWebcam in useCallback to stabilize its reference
   const predictWebcam = useCallback(() => {
     if (!videoRef.current) return;
     const video = videoRef.current;
@@ -173,7 +171,7 @@ export const useTongueSwitch = () => {
       stream?.getTracks().forEach(track => track.stop());
       faceLandmarkerRef.current?.close();
     };
-  }, [predictWebcam]); // FIXED: Added missing dependency
+  }, [predictWebcam]);
 
   const drawOverlay = (landmarks: NormalizedLandmark[], ctx: CanvasRenderingContext2D, width: number, height: number, isDetected: boolean, open: number, frac: number) => {
     ctx.save();
@@ -209,5 +207,5 @@ export const useTongueSwitch = () => {
     return false;
   };
 
-  return { consumeRisingEdge, videoRef, overlayCanvasRef, isWebcamReady };
+  return { consumeRisingEdge, videoRef, overlayCanvasRef, isWebcamReady, tongueOut };
 };

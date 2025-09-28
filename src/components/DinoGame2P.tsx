@@ -183,7 +183,7 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
             } else {
                 if (tongueOutStatesRef.current[0] && tongueOutStatesRef.current[1]) {
                     gameState.duoHoldTimer += dt;
-                    if (gameState.duoHoldTimer >= 5.0) resetGame();
+                    if (gameState.duoHoldTimer >= 3.0) resetGame();
                 } else {
                     gameState.duoHoldTimer = 0;
                 }

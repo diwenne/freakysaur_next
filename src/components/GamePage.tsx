@@ -10,17 +10,26 @@ import FlappyBird from './FlappyBird';
 
 type Game = 'dino' | 'dino2p' | 'flappy';
 
+// Props interface with corrected types to resolve compiler errors
+interface OnePlayerGamesProps {
+    activeGame: 'dino' | 'flappy';
+    dinoBestScore: number;
+    setDinoBestScore: React.Dispatch<React.SetStateAction<number>>;
+    flappyBestScore: number;
+    setFlappyBestScore: React.Dispatch<React.SetStateAction<number>>;
+}
+
 // Manages the 1-Player games and their shared webcam hook.
-const OnePlayerGames = ({ activeGame, dinoBestScore, setDinoBestScore, flappyBestScore, setFlappyBestScore }: any) => {
+const OnePlayerGames: React.FC<OnePlayerGamesProps> = ({ activeGame, dinoBestScore, setDinoBestScore, flappyBestScore, setFlappyBestScore }) => {
     const webcamContainerRef = useRef<HTMLDivElement>(null);
-    const tongue1P = useTongueSwitch();
-    const consumeRisingEdgeRef1P = useRef(tongue1P.consumeRisingEdge);
+    const { consumeRisingEdge, videoRef, overlayCanvasRef, isWebcamReady, tongueOut } = useTongueSwitch();
+    
+    const consumeRisingEdgeRef = useRef(consumeRisingEdge);
     useEffect(() => {
-        consumeRisingEdgeRef1P.current = tongue1P.consumeRisingEdge;
-    }, [tongue1P.consumeRisingEdge]);
+        consumeRisingEdgeRef.current = consumeRisingEdge;
+    }, [consumeRisingEdge]);
 
     useEffect(() => {
-        const { isWebcamReady, videoRef, overlayCanvasRef } = tongue1P;
         const container = webcamContainerRef.current;
         if (isWebcamReady && videoRef.current && overlayCanvasRef.current && container) {
             const videoElement = videoRef.current;
@@ -39,21 +48,21 @@ const OnePlayerGames = ({ activeGame, dinoBestScore, setDinoBestScore, flappyBes
             if (!container.contains(videoElement)) container.appendChild(videoElement);
             if (!container.contains(canvasElement)) container.appendChild(canvasElement);
         }
-    }, [tongue1P]);
+    }, [isWebcamReady, videoRef, overlayCanvasRef]);
 
     return (
         <>
             <div ref={webcamContainerRef} className="relative mb-4 border-2 border-gray-400 w-[900px] h-[240px] bg-gray-900 flex items-center justify-center overflow-hidden rounded-md">
-                {!tongue1P.isWebcamReady && <p className="text-white animate-pulse">Starting webcam...</p>}
+                {!isWebcamReady && <p className="text-white animate-pulse">Starting webcam...</p>}
             </div>
-            {!tongue1P.isWebcamReady ? (
+            {!isWebcamReady ? (
                  <div className="w-[900px] h-[560px] bg-gray-200 flex items-center justify-center border-2 border-gray-400 rounded-md">
                     <p className="text-gray-600 text-xl animate-pulse">Loading Game and Webcam...</p>
                 </div>
             ) : (
                 activeGame === 'dino' ? 
-                <DinoGame consumeRisingEdgeRef={consumeRisingEdgeRef1P} bestScore={dinoBestScore} setBestScore={setDinoBestScore} /> :
-                <FlappyBird consumeRisingEdgeRef={consumeRisingEdgeRef1P} bestScore={flappyBestScore} setBestScore={setFlappyBestScore} />
+                <DinoGame consumeRisingEdgeRef={consumeRisingEdgeRef} bestScore={dinoBestScore} setBestScore={setDinoBestScore} tongueOut={tongueOut} /> :
+                <FlappyBird consumeRisingEdgeRef={consumeRisingEdgeRef} bestScore={flappyBestScore} setBestScore={setFlappyBestScore} />
             )}
         </>
     );
@@ -62,14 +71,13 @@ const OnePlayerGames = ({ activeGame, dinoBestScore, setDinoBestScore, flappyBes
 // Manages the 2-Player game and its dedicated webcam hook.
 const TwoPlayerGame = () => {
     const webcamContainerRef = useRef<HTMLDivElement>(null);
-    const tongue2P = useTongueSwitch2P();
-    const consumeRisingEdgeRef2P = useRef(tongue2P.consumeRisingEdge);
+    const { consumeRisingEdge, videoRef, overlayCanvasRef, isWebcamReady, tongueOutStates } = useTongueSwitch2P();
+    const consumeRisingEdgeRef = useRef(consumeRisingEdge);
     useEffect(() => {
-        consumeRisingEdgeRef2P.current = tongue2P.consumeRisingEdge;
-    }, [tongue2P.consumeRisingEdge]);
+        consumeRisingEdgeRef.current = consumeRisingEdge;
+    }, [consumeRisingEdge]);
     
     useEffect(() => {
-        const { isWebcamReady, videoRef, overlayCanvasRef } = tongue2P;
         const container = webcamContainerRef.current;
         if (isWebcamReady && videoRef.current && overlayCanvasRef.current && container) {
             const videoElement = videoRef.current;
@@ -88,19 +96,19 @@ const TwoPlayerGame = () => {
             if (!container.contains(videoElement)) container.appendChild(videoElement);
             if (!container.contains(canvasElement)) container.appendChild(canvasElement);
         }
-    }, [tongue2P]);
+    }, [isWebcamReady, videoRef, overlayCanvasRef]);
 
     return (
          <>
             <div ref={webcamContainerRef} className="relative mb-4 border-2 border-gray-400 w-[900px] h-[240px] bg-gray-900 flex items-center justify-center overflow-hidden rounded-md">
-                {!tongue2P.isWebcamReady && <p className="text-white animate-pulse">Starting webcam...</p>}
+                {!isWebcamReady && <p className="text-white animate-pulse">Starting webcam...</p>}
             </div>
-            {!tongue2P.isWebcamReady ? (
+            {!isWebcamReady ? (
                  <div className="w-[900px] h-[560px] bg-gray-200 flex items-center justify-center border-2 border-gray-400 rounded-md">
                     <p className="text-gray-600 text-xl animate-pulse">Loading Game and Webcam...</p>
                 </div>
             ) : (
-                <DinoGame2P consumeRisingEdgeRef={consumeRisingEdgeRef2P} tongueOutStates={tongue2P.tongueOutStates} isCalibrating={!tongue2P.isWebcamReady} />
+                <DinoGame2P consumeRisingEdgeRef={consumeRisingEdgeRef} tongueOutStates={tongueOutStates} isCalibrating={!isWebcamReady} />
             )}
         </>
     );

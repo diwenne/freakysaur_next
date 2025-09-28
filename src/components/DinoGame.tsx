@@ -3,23 +3,13 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 
-// FIXED: Created specific types for the game assets to avoid using 'any'
+// --- Type Definitions, Asset Paths, Helper, Constants... ---
 interface DinoImages { RUN: HTMLImageElement[]; JUMP: HTMLImageElement[]; DUCK: HTMLImageElement[]; DEAD: HTMLImageElement; }
 interface GameImages {
     DINO: DinoImages;
-    OBSTACLES: {
-      CACTUS_SMALL: HTMLImageElement[];
-      CACTUS_LARGE: HTMLImageElement[];
-      BIRD: HTMLImageElement[];
-    };
-    OTHER: {
-      GROUND: HTMLImageElement;
-      CLOUD: HTMLImageElement;
-      GAME_OVER: HTMLImageElement;
-      RESET: HTMLImageElement;
-    };
+    OBSTACLES: { CACTUS_SMALL: HTMLImageElement[]; CACTUS_LARGE: HTMLImageElement[]; BIRD: HTMLImageElement[]; };
+    OTHER: { GROUND: HTMLImageElement; CLOUD: HTMLImageElement; GAME_OVER: HTMLImageElement; RESET: HTMLImageElement; };
 }
-
 const ASSETS = {
   DINO: { RUN: ['/assets/Dino/DinoRun1.png', '/assets/Dino/DinoRun2.png'], JUMP: ['/assets/Dino/DinoJump1.png', '/assets/Dino/DinoJump2.png', '/assets/Dino/DinoJump3.png', '/assets/Dino/DinoJump4.png'], DUCK: ['/assets/Dino/DinoDuck1.png', '/assets/Dino/DinoDuck2.png'], DEAD: '/assets/Dino/DinoDead.png' },
   OBSTACLES: { CACTUS_SMALL: ['/assets/Cactus/SmallCactus1.png', '/assets/Cactus/SmallCactus2.png', '/assets/Cactus/SmallCactus3.png'], CACTUS_LARGE: ['/assets/Cactus/LargeCactus1.png', '/assets/Cactus/LargeCactus2.png', '/assets/Cactus/LargeCactus3.png'], BIRD: ['/assets/Bird/Bird1.png', '/assets/Bird/Bird2.png'] },
@@ -30,19 +20,26 @@ const GAME_WIDTH = 900; const GAME_HEIGHT = 300; const GROUND_Y = 258; const DIN
 
 interface DinoGameProps {
     consumeRisingEdgeRef: React.MutableRefObject<() => boolean>;
+    tongueOut: boolean;
     bestScore: number;
     setBestScore: React.Dispatch<React.SetStateAction<number>>;
 }
 
-const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, setBestScore }) => {
+const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, tongueOut, bestScore, setBestScore }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameState = useRef({
-      dino: null as Dino | null, obstacles: [] as Obstacle[], clouds: [] as Cloud[], ground: null as Ground | null, speed: 420, score: 0, isGameOver: false, spawnTimer: 0, cloudTimer: 0, lastTime: 0,
-  }).current;
-  // FIXED: Used Partial<GameImages> because the object starts empty but will be filled
-  const gameImages = useRef<Partial<GameImages>>({}).current;
+  const gameImagesRef = useRef<Partial<GameImages>>({});
+  const gameStateRef = useRef({
+      dino: null as Dino | null, obstacles: [] as Obstacle[], clouds: [] as Cloud[], ground: null as Ground | null, speed: 420, score: 0, isGameOver: false, spawnTimer: 0, cloudTimer: 0, lastTime: 0, tongueHoldTimer: 0,
+  });
+  
+  const tongueOutRef = useRef(tongueOut);
+  useEffect(() => {
+    tongueOutRef.current = tongueOut;
+  }, [tongueOut]);
   
   const resetGame = useCallback(() => {
+    const gameState = gameStateRef.current;
+    const gameImages = gameImagesRef.current;
     if (!gameImages.DINO) return;
     gameState.dino = new Dino(gameImages.DINO);
     gameState.obstacles = [];
@@ -50,14 +47,16 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
     gameState.score = 0;
     gameState.isGameOver = false;
     gameState.spawnTimer = 0;
-    gameState.lastTime = performance.now();
-  }, [gameImages, gameState]);
+    gameState.lastTime = 0;
+    gameState.tongueHoldTimer = 0;
+  }, []);
 
   useEffect(() => {
     const handleInput = (e: KeyboardEvent) => {
         if (e.code !== 'Space' && e.code !== 'ArrowUp' && e.code !== 'ArrowDown') return;
         e.preventDefault();
         
+        const gameState = gameStateRef.current;
         if (e.type === 'keydown') {
             if (gameState.isGameOver) {
                 resetGame();
@@ -77,7 +76,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
       window.removeEventListener('keydown', handleInput);
       window.removeEventListener('keyup', handleInput);
     };
-  }, [gameState, resetGame]);
+  }, [resetGame]);
 
 
   useEffect(() => {
@@ -86,14 +85,18 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
 
     const gameLoop = (timestamp: number) => {
         const ctx = canvasRef.current?.getContext('2d');
+        const gameState = gameStateRef.current;
+        const gameImages = gameImagesRef.current;
         if (!ctx) {
             if(isMounted) animationFrameId = requestAnimationFrame(gameLoop);
             return;
         };
+        
+        if (gameState.lastTime === 0) gameState.lastTime = timestamp;
+        const dt = (timestamp - gameState.lastTime) / 1000;
+        gameState.lastTime = timestamp;
 
         if (!gameState.isGameOver) {
-            const dt = (timestamp - gameState.lastTime) / 1000 || 0;
-            gameState.lastTime = timestamp;
             if (consumeRisingEdgeRef.current()) gameState.dino?.startJump();
             gameState.ground?.update(dt, gameState.speed);
             gameState.dino?.update(dt);
@@ -150,6 +153,15 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
         ctx.fillText(scoreText, GAME_WIDTH - 20, 30);
 
         if (gameState.isGameOver) {
+            if (tongueOutRef.current) {
+                gameState.tongueHoldTimer += dt;
+                if (gameState.tongueHoldTimer >= 3.0) {
+                    resetGame();
+                }
+            } else {
+                gameState.tongueHoldTimer = 0;
+            }
+
             if (gameImages.OTHER) {
                 ctx.drawImage(gameImages.OTHER.GAME_OVER, GAME_WIDTH / 2 - gameImages.OTHER.GAME_OVER.width / 2, GAME_HEIGHT / 2 - 70);
                 ctx.drawImage(gameImages.OTHER.RESET, GAME_WIDTH / 2 - gameImages.OTHER.RESET.width / 2, GAME_HEIGHT / 2 - 25);
@@ -157,6 +169,21 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
                 ctx.fillStyle = '#535353';
                 ctx.textAlign = 'center';
                 ctx.fillText('space bar to play again', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 70);
+                
+                const barWidth = 250, barHeight = 12, barX = GAME_WIDTH / 2 - barWidth / 2, barY = GAME_HEIGHT / 2 + 95;
+                ctx.strokeStyle = '#535353';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+                const progress = Math.min(1, gameState.tongueHoldTimer / 5.0);
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+                
+                ctx.font = '16px Arial';
+                ctx.fillStyle = '#535353';
+                ctx.textAlign = 'center';
+                const remain = Math.max(0, 5.0 - gameState.tongueHoldTimer);
+                const holdText = tongueOutRef.current ? `Hold tongue for ${remain.toFixed(1)}s to restart` : `Hold tongue to restart`;
+                ctx.fillText(holdText, GAME_WIDTH / 2, barY + barHeight + 20);
             }
         }
         
@@ -165,6 +192,8 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
 
     const loadAllAssets = async () => {
         try {
+            const gameImages = gameImagesRef.current;
+            const gameState = gameStateRef.current;
             gameImages.DINO = { RUN: await Promise.all(ASSETS.DINO.RUN.map(loadImage)), JUMP: await Promise.all(ASSETS.DINO.JUMP.map(loadImage)), DUCK: await Promise.all(ASSETS.DINO.DUCK.map(loadImage)), DEAD: await loadImage(ASSETS.DINO.DEAD) };
             gameImages.OBSTACLES = { CACTUS_SMALL: await Promise.all(ASSETS.OBSTACLES.CACTUS_SMALL.map(loadImage)), CACTUS_LARGE: await Promise.all(ASSETS.OBSTACLES.CACTUS_LARGE.map(loadImage)), BIRD: await Promise.all(ASSETS.OBSTACLES.BIRD.map(loadImage)) };
             gameImages.OTHER = { GROUND: await loadImage(ASSETS.OTHER.GROUND), CLOUD: await loadImage(ASSETS.OTHER.CLOUD), GAME_OVER: await loadImage(ASSETS.OTHER.GAME_OVER), RESET: await loadImage(ASSETS.OTHER.RESET) };
@@ -182,9 +211,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
       isMounted = false;
       cancelAnimationFrame(animationFrameId);
     };
-    // FIXED: This warning is acceptable here, so we disable it for this line.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [resetGame, setBestScore, consumeRisingEdgeRef]);
 
   return <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="border-2 border-gray-400" />;
 };
@@ -192,7 +219,6 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, bestScore, se
 // --- Game Object Class Implementations ---
 const DEBUG_MODE = false; 
 class Dino { x = DINO_INITIAL_X; y = GROUND_Y; velY = 0; gravity = 2500; jumpSpeed = -900; isDucking = false; isAlive = true; images: DinoImages; currentImage: HTMLImageElement; width = 0; height = 0; runAnimTimer = 0; runAnimIndex = 0; runAnimRate = 0.09; jumpAnimTimer = 0; jumpAnimIndex = 0; jumpAnimRate = 0.1; 
-    // FIXED: Used the specific DinoImages type instead of 'any'
     constructor(images: DinoImages) { this.images = images; this.currentImage = this.images.RUN[0]; this.y = GROUND_Y - this.currentImage.height; this.width = this.currentImage.width; this.height = this.currentImage.height; } 
     getHitbox() { return { x: this.x + 20, y: this.y + 15, width: this.width - 35, height: this.height - 25 }; } startJump() { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.velY = this.jumpSpeed; this.jumpAnimIndex = 0; this.jumpAnimTimer = 0; } } setDuck(value: boolean) { if (this.isAlive && this.y + this.height >= GROUND_Y) { this.isDucking = value; } } die() { this.isAlive = false; this.currentImage = this.images.DEAD; } update(dt: number) { if (!this.isAlive) return; this.velY += this.gravity * dt; this.y += this.velY * dt; const onGround = this.y + this.height >= GROUND_Y; if (onGround) { this.y = GROUND_Y - this.height; this.velY = 0; } if (!onGround) { this.jumpAnimTimer += dt; if (this.jumpAnimTimer > this.jumpAnimRate) { this.jumpAnimTimer = 0; this.jumpAnimIndex = (this.jumpAnimIndex + 1) % this.images.JUMP.length; } this.currentImage = this.images.JUMP[this.jumpAnimIndex]; } else if (this.isDucking) { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.DUCK.length; } this.currentImage = this.images.DUCK[this.runAnimIndex]; } else { this.runAnimTimer += dt; if (this.runAnimTimer > this.runAnimRate) { this.runAnimTimer = 0; this.runAnimIndex = (this.runAnimIndex + 1) % this.images.RUN.length; } this.currentImage = this.images.RUN[this.runAnimIndex]; } this.width = this.currentImage.width; this.height = this.currentImage.height; if (onGround) { this.y = GROUND_Y - this.height; } } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.currentImage, this.x, this.y); if (DEBUG_MODE) { const box = this.getHitbox(); ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); } } 
 }
@@ -202,3 +228,4 @@ class Bird extends Obstacle { images: HTMLImageElement[]; animTimer = 0; animInd
 class Ground { image: HTMLImageElement; x1 = 0; x2: number; y: number; constructor(image: HTMLImageElement) { this.image = image; this.x2 = image.width; this.y = GROUND_Y - 20; } update(dt: number, speed: number) { this.x1 -= speed * dt; this.x2 -= speed * dt; if(this.x1 <= -this.image.width) this.x1 = this.x2 + this.image.width; if(this.x2 <= -this.image.width) this.x2 = this.x1 + this.image.width; } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x1, this.y); ctx.drawImage(this.image, this.x2, this.y); } }
 class Cloud { image: HTMLImageElement; x = GAME_WIDTH + Math.random() * 250; y = Math.random() * (GROUND_Y - 180) + 20; width: number; height: number; constructor(image: HTMLImageElement) { this.image = image; this.width = image.width; this.height = image.height; } update(dt: number, speed: number) { this.x -= (speed * 0.4) * dt; } draw(ctx: CanvasRenderingContext2D) { ctx.drawImage(this.image, this.x, this.y); } }
 export default DinoGame;
+
