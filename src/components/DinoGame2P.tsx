@@ -10,6 +10,11 @@ const ASSETS = {
   OBSTACLES: { CACTUS_SMALL: ['/assets/Cactus/SmallCactus1.png', '/assets/Cactus/SmallCactus2.png', '/assets/Cactus/SmallCactus3.png'], CACTUS_LARGE: ['/assets/Cactus/LargeCactus1.png', '/assets/Cactus/LargeCactus2.png', '/assets/Cactus/LargeCactus3.png'], BIRD: ['/assets/Bird/Bird1.png', '/assets/Bird/Bird2.png'] },
   OTHER: { GROUND: '/assets/Other/Track.png', CLOUD: '/assets/Other/Cloud.png', GAME_OVER: '/assets/Other/GameOver.png', RESET: '/assets/Other/Reset.png' },
 };
+interface GameImages {
+  DINO: DinoImages;
+  OBSTACLES: { CACTUS_SMALL: HTMLImageElement[]; CACTUS_LARGE: HTMLImageElement[]; BIRD: HTMLImageElement[]; };
+  OTHER: { GROUND: HTMLImageElement; CLOUD: HTMLImageElement; GAME_OVER: HTMLImageElement; RESET: HTMLImageElement; };
+}
 const loadImage = (src: string): Promise<HTMLImageElement> => { return new Promise((resolve, reject) => { const img = new Image(); img.src = src; img.onload = () => resolve(img); img.onerror = (err) => reject(err); }); };
 const GAME_WIDTH = 900; const GAME_HEIGHT = 560; const DINO_INITIAL_X = 40; const LANE_HEIGHT = GAME_HEIGHT / 2; const GROUND_Y_IN_LANE = 258;
 const DEBUG_MODE = false; 
@@ -53,7 +58,7 @@ class Cloud {
 }
 class Lane {
     dino: Dino; obstacles = new Set<Obstacle>(); clouds = new Set<Cloud>(); ground: Ground; score = 0; spawnTimer = 0; cloudTimer = 0;
-    constructor(public label: string, public labelColor: string, public images: any) {
+    constructor(public label: string, public labelColor: string, public images: GameImages) {
         this.dino = new Dino(GROUND_Y_IN_LANE, DINO_INITIAL_X, label, labelColor, images.DINO);
         this.ground = new Ground(images.OTHER.GROUND, GROUND_Y_IN_LANE, 420);
     }
@@ -230,4 +235,3 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
 };
 
 export default DinoGame2P;
-
