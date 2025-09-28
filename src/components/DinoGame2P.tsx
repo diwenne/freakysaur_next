@@ -62,7 +62,7 @@ class Lane {
         this.dino = new Dino(GROUND_Y_IN_LANE, DINO_INITIAL_X, label, labelColor, images.DINO);
         this.ground = new Ground(images.OTHER.GROUND, GROUND_Y_IN_LANE, 420);
     }
-    reset(images: any) { this.dino = new Dino(GROUND_Y_IN_LANE, DINO_INITIAL_X, this.label, this.labelColor, images.DINO); this.obstacles.clear(); this.clouds.clear(); this.ground = new Ground(images.OTHER.GROUND, GROUND_Y_IN_LANE, 420); this.score = 0; this.spawnTimer = 0; this.cloudTimer = 0; }
+    reset(images: GameImages) { this.dino = new Dino(GROUND_Y_IN_LANE, DINO_INITIAL_X, this.label, this.labelColor, images.DINO); this.obstacles.clear(); this.clouds.clear(); this.ground = new Ground(images.OTHER.GROUND, GROUND_Y_IN_LANE, 420); this.score = 0; this.spawnTimer = 0; this.cloudTimer = 0; }
     update(dt: number, speed: number) { 
         this.dino.update(dt); 
         this.ground.speed = speed; 
@@ -97,7 +97,7 @@ interface DinoGame2PProps {
 
 const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOutStates, isCalibrating }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const gameImages = useRef<any>({}).current;
+    const gameImages = useRef<Partial<GameImages>>({}).current;
     const gameState = useRef({ lanes: [] as Lane[], isGameOver: true, winner: '', speed: 420, lastTime: 0, duoHoldTimer: 0 }).current;
     const animationFrameId = useRef<number | null>(null);
 
@@ -119,8 +119,8 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
                 
                 if (isMounted) {
                     if (gameState.lanes.length === 0) {
-                        gameState.lanes.push(new Lane('P1', '#3b82f6', gameImages));
-                        gameState.lanes.push(new Lane('P2', '#f97316', gameImages));
+                        gameState.lanes.push(new Lane('P1', '#3b82f6', gameImages as GameImages));
+                        gameState.lanes.push(new Lane('P2', '#f97316', gameImages as GameImages));
                     }
                     setIsGameReady(true);
                 }
@@ -136,7 +136,7 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
         if (!isGameReady || isCalibrating) return;
 
         const resetGame = () => {
-            gameState.lanes.forEach(lane => lane.reset(gameImages));
+            gameState.lanes.forEach(lane => lane.reset(gameImages as GameImages));
             gameState.isGameOver = false;
             gameState.winner = '';
             gameState.duoHoldTimer = 0;

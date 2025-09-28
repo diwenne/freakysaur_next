@@ -211,7 +211,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ consumeRisingEdgeRef, tongueOut, be
       isMounted = false;
       cancelAnimationFrame(animationFrameId);
     };
-  }, [resetGame, setBestScore, consumeRisingEdgeRef]);
+  }, [resetGame, setBestScore, bestScore, consumeRisingEdgeRef]);
 
   return <canvas ref={canvasRef} width={GAME_WIDTH} height={GAME_HEIGHT} className="border-2 border-gray-400" />;
 };
