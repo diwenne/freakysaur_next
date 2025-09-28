@@ -58,8 +58,26 @@ class Lane {
         this.ground = new Ground(images.OTHER.GROUND, GROUND_Y_IN_LANE, 420);
     }
     reset(images: any) { this.dino = new Dino(GROUND_Y_IN_LANE, DINO_INITIAL_X, this.label, this.labelColor, images.DINO); this.obstacles.clear(); this.clouds.clear(); this.ground = new Ground(images.OTHER.GROUND, GROUND_Y_IN_LANE, 420); this.score = 0; this.spawnTimer = 0; this.cloudTimer = 0; }
-    update(dt: number, speed: number) { this.dino.update(dt); this.ground.speed = speed; this.ground.update(dt); this.obstacles.forEach(o => { o.speed = speed; o.update(dt); if (o.x < -100) this.obstacles.delete(o); }); this.clouds.forEach(c => { c.speed = speed * 0.4; c.update(dt); if (c.x < -100) this.clouds.delete(c); }); if (this.dino.alive) this.score += dt * 10;
-        this.spawnTimer += dt; if (this.spawnTimer > 1.2) { this.spawnTimer = 0; Math.random() < 0.7 ? this.obstacles.add(new Cactus(this.images.OBSTACLES.CACTUS_LARGE[0], GROUND_Y_IN_LANE, speed)) : this.obstacles.add(new Bird(this.images.OBSTACLES.BIRD, GROUND_Y_IN_LANE, speed)); }
+    update(dt: number, speed: number) { 
+        this.dino.update(dt); 
+        this.ground.speed = speed; 
+        this.ground.update(dt); 
+        this.obstacles.forEach(o => { o.speed = speed; o.update(dt); if (o.x < -100) this.obstacles.delete(o); }); 
+        this.clouds.forEach(c => { c.speed = speed * 0.4; c.update(dt); if (c.x < -100) this.clouds.delete(c); }); 
+        if (this.dino.alive) this.score += dt * 10;
+        
+        this.spawnTimer += dt; 
+        if (this.spawnTimer > 1.2) { 
+            this.spawnTimer = 0; 
+            if (Math.random() < 0.7) { // 70% chance for a cactus
+                const isSmall = Math.random() < 0.5;
+                const cactusGroup = isSmall ? this.images.OBSTACLES.CACTUS_SMALL : this.images.OBSTACLES.CACTUS_LARGE;
+                const randomCactusImage = cactusGroup[Math.floor(Math.random() * cactusGroup.length)];
+                this.obstacles.add(new Cactus(randomCactusImage, GROUND_Y_IN_LANE, speed));
+            } else { // 30% chance for a bird
+                this.obstacles.add(new Bird(this.images.OBSTACLES.BIRD, GROUND_Y_IN_LANE, speed));
+            }
+        }
         this.cloudTimer += dt; if (this.cloudTimer > 1.5) { this.cloudTimer = 0; this.clouds.add(new Cloud(this.images.OTHER.CLOUD, speed)); }
     }
     draw(ctx: CanvasRenderingContext2D, font: string, fontSmall: string) { this.clouds.forEach(c => c.draw(ctx)); this.ground.draw(ctx); this.obstacles.forEach(o => o.draw(ctx)); this.dino.draw(ctx, fontSmall); const scoreText = `Score: ${Math.floor(this.score).toString().padStart(5, '0')}`; ctx.font = font; ctx.fillStyle = '#3C3C3C'; ctx.textAlign = 'left'; ctx.fillText(scoreText, 10, 25); }
@@ -80,13 +98,11 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
 
     const [isGameReady, setIsGameReady] = useState(false);
     
-    // Create a ref to hold the latest tongueOutStates without re-triggering the main effect.
     const tongueOutStatesRef = useRef(tongueOutStates);
     useEffect(() => {
         tongueOutStatesRef.current = tongueOutStates;
     }, [tongueOutStates]);
 
-    // This effect runs ONCE on component mount to load assets and initialize game objects.
     useEffect(() => {
         let isMounted = true;
         
@@ -111,7 +127,6 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
         return () => { isMounted = false; };
     }, [gameImages, gameState.lanes]);
 
-    // This effect manages the game loop and event listeners.
     useEffect(() => {
         if (!isGameReady || isCalibrating) return;
 
@@ -120,7 +135,7 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
             gameState.isGameOver = false;
             gameState.winner = '';
             gameState.duoHoldTimer = 0;
-            gameState.lastTime = performance.now();
+            gameState.lastTime = 0; // Set to 0 to handle dt correctly on first frame after reset
         };
 
         const handleInput = (e: KeyboardEvent) => {
@@ -140,15 +155,12 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
         };
 
         const gameLoop = (timestamp: number) => {
+            animationFrameId.current = requestAnimationFrame(gameLoop);
             const ctx = canvasRef.current?.getContext('2d');
-            if (!ctx) {
-                animationFrameId.current = requestAnimationFrame(gameLoop);
-                return;
-            };
+            if (!ctx) return;
             
-            // This prevents a huge dt on the first frame after a long pause.
             if (gameState.lastTime === 0) gameState.lastTime = timestamp;
-            const dt = (timestamp - gameState.lastTime) / 1000 || 0;
+            const dt = (timestamp - gameState.lastTime) / 1000;
             gameState.lastTime = timestamp;
 
             if (!gameState.isGameOver) {
@@ -198,7 +210,6 @@ const DinoGame2P: React.FC<DinoGame2PProps> = ({ consumeRisingEdgeRef, tongueOut
                 ctx.font = '16px Arial'; ctx.fillStyle = 'white';
                 ctx.fillText(`Hold Both Tongues to Restart: ${Math.floor(progress*100)}%`, GAME_WIDTH/2, barY + 40);
             }
-             animationFrameId.current = requestAnimationFrame(gameLoop);
         };
         
         resetGame();
